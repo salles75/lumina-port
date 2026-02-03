@@ -1,0 +1,116 @@
+version: '3.8'
+
+services:
+  # ===========================================
+  # PostgreSQL Database
+  # ===========================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: lumina-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: lumina
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ===========================================
+  # Redis (Cache & Queue)
+  # ===========================================
+  redis:
+    image: redis:7-alpine
+    container_name: lumina-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ===========================================
+  # NLP Engine (Python/FastAPI)
+  # ===========================================
+  nlp-engine:
+    build:
+      context: ./apps/nlp-engine
+      dockerfile: Dockerfile
+    container_name: lumina-nlp
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - LOG_LEVEL=info
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ===========================================
+  # API Gateway (Node.js)
+  # ===========================================
+  api-gateway:
+    build:
+      context: ./apps/api-gateway
+      dockerfile: Dockerfile
+    container_name: lumina-api
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/lumina?schema=public
+      - REDIS_URL=redis://redis:6379
+      - NLP_ENGINE_URL=http://nlp-engine:8000
+      - NODE_ENV=production
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nlp-engine:
+        condition: service_healthy
+
+  # ===========================================
+  # Frontend (Next.js)
+  # ===========================================
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+    container_name: lumina-web
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:4000
+      - NODE_ENV=production
+    env_file:
+      - .env
+    depends_on:
+      - api-gateway
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  default:
+    name: lumina-network

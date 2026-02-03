@@ -1,0 +1,32 @@
+{
+  "name": "lumina",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Plataforma SaaS de Análise de Sentimento e Feedback",
+  "scripts": {
+    "setup": "bash scripts/setup.sh",
+    "dev": "bash scripts/dev.sh",
+    "dev:web": "cd apps/web && npm run dev",
+    "dev:api": "cd apps/api-gateway && npm run dev",
+    "dev:nlp": "cd apps/nlp-engine && python main.py",
+    "build": "npm run build:web && npm run build:api",
+    "build:web": "cd apps/web && npm run build",
+    "build:api": "cd apps/api-gateway && npm run build",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:build": "docker-compose build",
+    "db:push": "cd apps/api-gateway && npx prisma db push",
+    "db:migrate": "cd apps/api-gateway && npx prisma migrate dev",
+    "db:studio": "cd apps/api-gateway && npx prisma studio"
+  },
+  "keywords": [
+    "sentiment-analysis",
+    "nlp",
+    "saas",
+    "nextjs",
+    "fastapi",
+    "typescript"
+  ],
+  "author": "Lumina",
+  "license": "MIT"
+}

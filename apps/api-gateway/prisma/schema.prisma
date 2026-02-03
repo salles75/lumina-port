@@ -1,0 +1,163 @@
+// Prisma Schema for Lumina
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==========================================
+// User & Authentication
+// ==========================================
+
+model User {
+  id            String    @id @default(cuid())
+  clerkId       String    @unique
+  email         String    @unique
+  name          String?
+  imageUrl      String?
+  
+  // Subscription
+  plan          Plan      @default(FREE)
+  stripeCustomerId String? @unique
+  stripeSubscriptionId String?
+  stripePriceId String?
+  stripeCurrentPeriodEnd DateTime?
+  
+  // Usage tracking
+  analysisCount Int       @default(0)
+  analysisLimit Int       @default(100)
+  
+  // Relations
+  analyses      Analysis[]
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([clerkId])
+  @@index([email])
+}
+
+enum Plan {
+  FREE
+  PRO
+  ENTERPRISE
+}
+
+// ==========================================
+// Analysis & Sentiment Data
+// ==========================================
+
+model Analysis {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Source info
+  name          String
+  type          AnalysisType
+  sourceUrl     String?
+  fileName      String?
+  
+  // Status
+  status        AnalysisStatus @default(PENDING)
+  errorMessage  String?
+  
+  // Results
+  totalFeedbacks Int       @default(0)
+  positiveCount  Int       @default(0)
+  neutralCount   Int       @default(0)
+  negativeCount  Int       @default(0)
+  averageScore   Float     @default(0)
+  
+  // Relations
+  feedbacks     Feedback[]
+  keywords      Keyword[]
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  completedAt   DateTime?
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+enum AnalysisType {
+  URL
+  CSV
+  TEXT
+  API
+}
+
+enum AnalysisStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model Feedback {
+  id            String    @id @default(cuid())
+  analysisId    String
+  analysis      Analysis  @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  
+  // Content
+  text          String
+  originalDate  DateTime?
+  
+  // Sentiment analysis
+  sentiment     Sentiment
+  confidence    Float     @default(0)
+  score         Float     @default(0)
+  
+  createdAt     DateTime  @default(now())
+
+  @@index([analysisId])
+  @@index([sentiment])
+}
+
+enum Sentiment {
+  POSITIVE
+  NEUTRAL
+  NEGATIVE
+}
+
+model Keyword {
+  id            String    @id @default(cuid())
+  analysisId    String
+  analysis      Analysis  @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  
+  word          String
+  count         Int       @default(1)
+  sentiment     Sentiment
+  
+  createdAt     DateTime  @default(now())
+
+  @@unique([analysisId, word])
+  @@index([analysisId])
+}
+
+// ==========================================
+// Audit & Logging
+// ==========================================
+
+model AuditLog {
+  id            String    @id @default(cuid())
+  userId        String?
+  action        String
+  resource      String
+  resourceId    String?
+  metadata      Json?
+  ipAddress     String?
+  userAgent     String?
+  
+  createdAt     DateTime  @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+}
